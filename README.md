@@ -29,19 +29,47 @@
 - `shutup_reply`：闭嘴时的回复消息，支持占位符 `{duration}`(禁言时长，秒)和 `{expiry_time}`(禁言结束时间)，默认 `好的，我闭嘴了~`
 - `unshutup_reply`：解除闭嘴时的回复消息，支持占位符 `{duration}` 和 `{expiry_time}`，默认 `好的，我恢复说话了~`
 - `require_prefix`：是否启用前缀模式，默认`启用`
-- `scheduled_shutup_enabled`:是否启用定时闭嘴，默认`关闭`
-- `scheduled_shutup_times`:定时闭嘴时间段
-- `group_card_update_enabled`:是否启用群昵称剩余时长显示
-- `group_card_template`:群昵称显示模板
+- `scheduled_shutup_enabled`：是否启用定时闭嘴，默认`关闭`
+- `scheduled_shutup_times`：定时闭嘴时间段
+- `group_card_update_enabled`：是否启用群昵称剩余时长显示
+- `group_card_template`：群昵称显示模板
+- `llm_tool_enabled`：是否启用 LLM 工具调用，默认`关闭`
+- `require_admin`：是否需要管理员权限，默认`关闭`
+
+## LLM 工具调用
+
+启用 `llm_tool_enabled` 配置后，LLM 可以主动调用闭嘴功能：
+
+- **shutup**：让机器人在指定时间内停止回复消息
+  - LLM 会根据用户意图自主决定合适的闭嘴时长
+  - 支持时间单位：s(秒)、m(分钟)、h(小时)
+  - 最长闭嘴时长限制为 60 分钟
+  - 默认单位为分钟
+
+### 使用示例
+
+当启用 LLM 工具后，用户可以用自然语言表达：
+- "让机器人安静一会儿" → LLM 调用 shutup
+- "让它闭嘴 10 分钟" → LLM 调用 shutup(10, "m")
+- "机器人别说话了" → LLM 调用 shutup
+
 ## 注意事项
 - 闭嘴状态仅对当前会话有效
 - 在闭嘴期间，可以随时使用解除指令让机器人恢复回复
 - 定时闭嘴期间，无法通过指令解除(后续更新可能会加上)
+- LLM 工具调用的闭嘴时长最长为 60 分钟
 
 ## 更新日志
-### ToDo
-- [ ] 注册函数供LLM调用
-- [x] 使用群昵称显示闭嘴状态
+
+### v1.5.0
+- 实现 LLM 工具调用功能
+  - 新增 `shutup` 工具，LLM 可以根据用户意图自主决定闭嘴时长
+  - 限制 LLM 工具调用的最大闭嘴时长为 60 分钟
+  - 通过 `llm_tool_enabled` 配置项控制是否启用
+- 新增权限控制功能
+  - 添加 `require_admin` 配置项，可限制只有管理员才能使用闭嘴指令
+- 调整默认优先级为 10000
+- 修复多次闭嘴指令后，群昵称错误的问题
 
 ### v1.4
 - 添加群昵称剩余时长显示功能
