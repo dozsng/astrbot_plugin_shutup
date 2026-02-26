@@ -3,13 +3,13 @@
     "type": "list",
     "description": "闭嘴指令列表",
     "items": { "type": "string" },
-    "default": ["闭嘴", "stop"]
+    "default": ["闭嘴", "stop","睡吧"]
   },
   "unshutup_commands": {
     "type": "list",
     "description": "解除闭嘴指令列表",
     "items": { "type": "string" },
-    "default": ["说话", "停止闭嘴"]
+    "default": ["说话", "停止闭嘴","醒醒"]
   },
   "default_duration": {
     "type": "int",
