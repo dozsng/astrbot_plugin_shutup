@@ -49,7 +49,7 @@
 "bot_name": {
     "type": "string",
     "description": "机器人的自称",
-    "hint":"用于睡眠提示语。建议将此名字同步加入 AstrBot 平台设置中的‘唤醒词’，以实现直接喊名字唤醒的功能喵！",,
+    "hint":"用于睡眠提示语。建议将此名字同步加入 AstrBot 平台设置中的‘唤醒词’，以实现直接喊名字唤醒的功能喵！",
     "default": "小爱"
   },
   "sleep_mode_enabled": {
@@ -57,6 +57,12 @@
     "description": "启用睡眠唤醒互动",
     "hint": "开启后，定时闭嘴期间会有相应的哄睡、叫醒等互动提示语。若仅需要安静的定时禁言，请关闭此项",
     "default": true
+  },
+"temp_wake_duration": {
+    "type": "int",
+    "description": "临时唤醒保持时长(秒)",
+    "hint": "睡眠模式下，bot 被叫醒后保持清醒的状态时长，过期后将重新入睡。默认 300 秒 (5分钟)，推荐填写60的倍数，叫醒会显示'时间//60'分钟",
+    "default": 300
   },
   "scheduled_shutup_times": {
     "type": "text",

@@ -71,7 +71,23 @@ class ShutupPlugin(Star):
         self.bot_name = config.get("bot_name", "小爱")  # 默认叫小爱，可以在配置面板改喵
         self.sleep_mode_enabled = config.get("sleep_mode_enabled", True)  # 新增：睡眠模式开关
         self.temp_wake_map = {}  # 记录谁把bot叫醒了
-        self.temp_wake_duration = config.get("temp_wake_duration", 300)  # 默认清醒 300秒 (5分钟)
+        # 睡眠唤醒持续时间（秒），确保为非负整数
+        raw_temp_wake_duration = config.get("temp_wake_duration", 300)
+        try:
+            temp_wake_duration = int(raw_temp_wake_duration)
+        except (TypeError, ValueError):
+            logger.warning(
+                f"[ShutupPlugin] Invalid temp_wake_duration={raw_temp_wake_duration!r}, "
+                "falling back to default 300s."
+            )
+            temp_wake_duration = 300
+        if temp_wake_duration < 0:
+            logger.warning(
+                f"[ShutupPlugin] temp_wake_duration is negative ({temp_wake_duration}), "
+                "clamping to 0."
+            )
+            temp_wake_duration = 0
+        self.temp_wake_duration = temp_wake_duration  # 默认清醒 300秒 (5分钟)
         # 使用 pathlib 优化路径处理
         self.data_dir = (
             Path(__file__).parent.parent.parent

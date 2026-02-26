@@ -34,6 +34,7 @@
 - `scheduled_shutup_times`：定时闭嘴时间段
 - `bot_name`：机器人的自称（用于睡眠唤醒等提示语中），默认 `小爱`
 - `sleep_mode_enabled`：是否启用睡眠唤醒互动（开启后定时闭嘴期间会有相应的哄睡、叫醒等提示语），默认 `启用`
+- `temp_wake_duration`：睡眠模式下被临时叫醒后保持清醒的时长（秒），默认使用插件内置值，如需调整请在配置文件中显式设置
 - `group_card_update_enabled`：是否启用群昵称剩余时长显示
 - `group_card_template`：群昵称显示模板
 - `llm_tool_enabled`：是否启用 LLM 工具调用，默认`关闭`
