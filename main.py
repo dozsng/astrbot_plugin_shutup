@@ -36,7 +36,7 @@ class ShutupPlugin(Star):
         # 限制 default_duration 范围在 0-86400 秒(0-24小时)
         duration_config = config.get("default_duration", 600)
         if not isinstance(duration_config, (int, float)) or not (
-                0 <= duration_config <= 86400
+            0 <= duration_config <= 86400
         ):
             logger.warning(
                 f"[Shutup] ⚠️ default_duration 配置无效({duration_config})，使用默认值 600s"
@@ -74,9 +74,9 @@ class ShutupPlugin(Star):
         self.temp_wake_duration = config.get("temp_wake_duration", 300)  # 默认清醒 300秒 (5分钟)
         # 使用 pathlib 优化路径处理
         self.data_dir = (
-                Path(__file__).parent.parent.parent
-                / "plugin_data"
-                / "astrbot_plugin_shutup"
+            Path(__file__).parent.parent.parent
+            / "plugin_data"
+            / "astrbot_plugin_shutup"
         )
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.silence_map_path = self.data_dir / "silence_map.json"
@@ -214,7 +214,7 @@ class ShutupPlugin(Star):
         return str(sender_id) in [str(admin) for admin in admins]
 
     async def _update_group_card(
-            self, event: AstrMessageEvent, origin: str, remaining_minutes: int
+        self, event: AstrMessageEvent, origin: str, remaining_minutes: int
     ) -> None:
         """更新群昵称显示剩余时长"""
         if not self.group_card_enabled:
@@ -260,11 +260,11 @@ class ShutupPlugin(Star):
                     )
                     # 群昵称(群名片)
                     self.original_group_cards[origin] = (
-                            member_info.get("card", "") or ""
+                        member_info.get("card", "") or ""
                     )
                     # QQ昵称
                     self.original_nicknames[origin] = (
-                            member_info.get("nickname", "") or ""
+                        member_info.get("nickname", "") or ""
                     )
                     logger.debug(
                         f"[Shutup] 保存原始信息 | 群昵称: {self.original_group_cards[origin]} | QQ昵称: {self.original_nicknames[origin]}"
@@ -384,7 +384,7 @@ class ShutupPlugin(Star):
                 event.stop_event()
                 return
 
-        # 3. 检查定时闭嘴 (bot的睡眠时间)  <-- 注意这里，和上面的 if 是平级的喵！
+        # 3. 检查定时闭嘴 (bot的睡眠时间)
         if self._is_in_scheduled_time():
             if self.sleep_mode_enabled:
                 # 开启了睡眠模式：执行睡眠互动逻辑
@@ -457,7 +457,7 @@ class ShutupPlugin(Star):
                 return
 
     async def _handle_shutup_command(
-            self, event: AstrMessageEvent, text: str, origin: str
+        self, event: AstrMessageEvent, text: str, origin: str
     ) -> str:
         """处理闭嘴指令"""
         # ====== 判断是不是在半夜提前哄睡 ======
@@ -506,7 +506,7 @@ class ShutupPlugin(Star):
         return self.shutup_reply.format(duration=duration, expiry_time=expiry_time)
 
     async def _handle_unshutup_command(
-            self, event: AstrMessageEvent, origin: str
+        self, event: AstrMessageEvent, origin: str
     ) -> str:
         """处理解除闭嘴指令"""
         # 计算已禁言时长
