@@ -537,6 +537,10 @@ class ShutupPlugin(Star):
         self.silence_map.pop(origin, None)
         self._save_silence_map()
 
+        now = time.time()
+        # 增加状态检查：判断当前是否已处于临时的“梦游清醒”状态
+        is_already_awake = origin in self.temp_wake_map and now < self.temp_wake_map[origin]
+
         # 恢复原始群昵称(如果启用)
         if self.group_card_enabled:
             await self._update_group_card(event, origin, 0)
@@ -545,17 +549,24 @@ class ShutupPlugin(Star):
             self.origin_to_event_map.pop(origin, None)
 
         expiry_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
-        # ====== 新增：处理睡眠期间被强行叫醒 ======
+        # ====== 处理睡眠期间被强行叫醒 ======
         if self.sleep_mode_enabled:
             if self._is_in_scheduled_time():
-                self.temp_wake_map[origin] = time.time() + self.temp_wake_duration
+                # 更新或刷新清醒到期时间
+                self.temp_wake_map[origin] = now + self.temp_wake_duration
                 wake_minutes = self.temp_wake_duration // 60
+
+                # 如果已经是清醒状态，则返回简洁的确认信息，避免重复播放较长的“被叫醒”台词
+                if is_already_awake:
+                    return f"{self.bot_name} 已经醒啦，会再陪你聊 {wake_minutes} 分钟哦~"
+
+                # 第一次被叫醒时的完整回复
                 logger.info(f"[Shutup] ⏰ 睡眠期间被叫醒，清醒 {wake_minutes} 分钟")
                 return f"谁呀...{self.bot_name}被叫醒了，还能强撑着陪你聊 {wake_minutes} 分钟哦..."
 
+            # 正常解除禁言日志
             logger.info(f"[Shutup] 🔊 已解除禁言 | 已禁言: {duration}s")
-            # 睡眠模式下白天唤醒的回复
-            return f"{self.bot_name}早就醒着啦喵！随时可以陪你聊天哦~"
+            return f"{self.bot_name}早就醒着啦！随时可以陪你聊天哦~"
 
         # ====== 如果没开睡眠模式，就用原作者设定的默认解除文本 ======
         logger.info(f"[Shutup] 🔊 已解除禁言 | 已禁言: {duration}s")
