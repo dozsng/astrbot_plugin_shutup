@@ -384,45 +384,45 @@ class ShutupPlugin(Star):
                 event.stop_event()
                 return
 
-            # 3. 检查定时闭嘴 (bot的睡眠时间)
-            if self._is_in_scheduled_time():
-                if self.sleep_mode_enabled:
-                    # 开启了睡眠模式：执行睡眠互动逻辑
-                    wake_expiry = self.temp_wake_map.get(origin)
-                    if wake_expiry and time.time() < wake_expiry:
-                        remaining = int(wake_expiry - time.time())
-                        logger.info(f"[Shutup] ⏰ bot正处于梦游清醒状态 | 剩余: {remaining}s")
-                    else:
-                        if wake_expiry:
-                            self.temp_wake_map.pop(origin, None)
-
-                        logger.info("[Shutup] ⏰ 定时闭嘴(睡眠)生效中，呼呼呼...")
-
-                        # 判断是否是在呼叫 bot
-                        is_talking_to_me = self._check_prefix(event)
-                        cmd_prefix = self.context.get_config().get("command_prefix", "/")
-                        if isinstance(cmd_prefix, list):
-                            if any(text.startswith(p) for p in cmd_prefix):
-                                is_talking_to_me = True
-                        elif isinstance(cmd_prefix, str) and text.startswith(cmd_prefix):
-                            is_talking_to_me = True
-
-                        if is_talking_to_me:
-                            wake_word = self.unshutup_cmds[0] if self.unshutup_cmds else f"{self.bot_name}醒醒"
-                            display_prefix = cmd_prefix[0] if isinstance(cmd_prefix, list) and cmd_prefix else (
-                                "" if isinstance(cmd_prefix, list) else cmd_prefix)
-                            yield event.plain_result(
-                                f"{self.bot_name}已经睡了，要叫醒{self.bot_name}吗~（回复：{display_prefix}{wake_word}）")
-
-                        event.should_call_llm(False)
-                        event.stop_event()
-                        return
+        # 3. 检查定时闭嘴 (bot的睡眠时间)  <-- 注意这里，和上面的 if 是平级的喵！
+        if self._is_in_scheduled_time():
+            if self.sleep_mode_enabled:
+                # 开启了睡眠模式：执行睡眠互动逻辑
+                wake_expiry = self.temp_wake_map.get(origin)
+                if wake_expiry and time.time() < wake_expiry:
+                    remaining = int(wake_expiry - time.time())
+                    logger.info(f"[Shutup] ⏰ bot正处于梦游清醒状态 | 剩余: {remaining}s")
                 else:
-                    # 没开启睡眠模式：直接安静拦截，不回复任何话
-                    logger.info("[Shutup] ⏰ 定时闭嘴生效中")
+                    if wake_expiry:
+                        self.temp_wake_map.pop(origin, None)
+
+                    logger.info("[Shutup] ⏰ 定时闭嘴(睡眠)生效中，呼呼呼...")
+
+                    # 判断是否是在呼叫 bot
+                    is_talking_to_me = self._check_prefix(event)
+                    cmd_prefix = self.context.get_config().get("command_prefix", "/")
+                    if isinstance(cmd_prefix, list):
+                        if any(text.startswith(p) for p in cmd_prefix):
+                            is_talking_to_me = True
+                    elif isinstance(cmd_prefix, str) and text.startswith(cmd_prefix):
+                        is_talking_to_me = True
+
+                    if is_talking_to_me:
+                        wake_word = self.unshutup_cmds[0] if self.unshutup_cmds else f"{self.bot_name}醒醒"
+                        display_prefix = cmd_prefix[0] if isinstance(cmd_prefix, list) and cmd_prefix else (
+                            "" if isinstance(cmd_prefix, list) else cmd_prefix)
+                        yield event.plain_result(
+                            f"{self.bot_name}已经睡了，要叫醒{self.bot_name}吗~（回复：{display_prefix}{wake_word}）")
+
                     event.should_call_llm(False)
                     event.stop_event()
                     return
+            else:
+                # 没开启睡眠模式：直接安静拦截，不回复任何话
+                logger.info("[Shutup] ⏰ 定时闭嘴生效中")
+                event.should_call_llm(False)
+                event.stop_event()
+                return
 
         # 4. 检查手动禁言状态
         expiry = self.silence_map.get(origin)
