@@ -398,19 +398,34 @@ class ShutupPlugin(Star):
 
                     logger.info("[Shutup] ⏰ 定时闭嘴(睡眠)生效中，呼呼呼...")
 
-                    # 判断是否是在呼叫 bot
-                    is_talking_to_me = self._check_prefix(event)
-                    cmd_prefix = self.context.get_config().get("command_prefix", "/")
-                    if isinstance(cmd_prefix, list):
-                        if any(text.startswith(p) for p in cmd_prefix):
+                    # ====== 严格判断是否在明确呼叫 bot（防刷屏） ======
+                    is_talking_to_me = False
+                    chain = event.get_messages()
+                    if chain:
+                        first_seg = chain[0]
+                        # 1. 检查是否明确 @ 了 bot
+                        if isinstance(first_seg, Comp.At) and str(first_seg.qq) == str(event.get_self_id()):
                             is_talking_to_me = True
-                    elif isinstance(cmd_prefix, str) and text.startswith(cmd_prefix):
+                        # 2. 检查是否使用了设定的唤醒前缀 (wake_prefix)
+                        elif isinstance(first_seg, Comp.Plain) and self.wake_prefix:
+                            if any(first_seg.text.startswith(p) for p in self.wake_prefix):
+                                is_talking_to_me = True
+
+                    # 3. 检查是否带有全局命令符 (如 /)
+                    cmd_prefix = self.context.get_config().get("command_prefix", "/")
+                    prefixes = cmd_prefix if isinstance(cmd_prefix, list) else [cmd_prefix]
+                    if any(text.startswith(p) for p in prefixes if p):  # 确保前缀不为空
                         is_talking_to_me = True
 
                     if is_talking_to_me:
                         wake_word = self.unshutup_cmds[0] if self.unshutup_cmds else f"{self.bot_name}醒醒"
-                        display_prefix = cmd_prefix[0] if isinstance(cmd_prefix, list) and cmd_prefix else (
-                            "" if isinstance(cmd_prefix, list) else cmd_prefix)
+
+                        # 如果需要前缀才加上，不需要的话就直接显示命令文本
+                        display_prefix = ""
+                        if self.require_prefix:
+                            display_prefix = cmd_prefix[0] if isinstance(cmd_prefix, list) and cmd_prefix else (
+                                "" if isinstance(cmd_prefix, list) else cmd_prefix)
+
                         yield event.plain_result(
                             f"{self.bot_name}已经睡了，要叫醒{self.bot_name}吗~（回复：{display_prefix}{wake_word}）")
 
