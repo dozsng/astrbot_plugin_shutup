@@ -9,6 +9,7 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 
+
 class ShutupPlugin(Star):
     # 时间单位转换(秒)
     TIME_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
@@ -35,7 +36,7 @@ class ShutupPlugin(Star):
         # 限制 default_duration 范围在 0-86400 秒(0-24小时)
         duration_config = config.get("default_duration", 600)
         if not isinstance(duration_config, (int, float)) or not (
-            0 <= duration_config <= 86400
+                0 <= duration_config <= 86400
         ):
             logger.warning(
                 f"[Shutup] ⚠️ default_duration 配置无效({duration_config})，使用默认值 600s"
@@ -66,11 +67,16 @@ class ShutupPlugin(Star):
         self.scheduled_time_ranges = self._parse_time_ranges(self.scheduled_times_text)
 
         self.silence_map = {}
+        # ====== 新增：睡眠唤醒配置 ======
+        self.bot_name = config.get("bot_name", "小爱")  # 默认叫小爱，可以在配置面板改喵
+        self.temp_wake_map = {}  # 记录谁把bot叫醒了
+        self.temp_wake_duration = config.get("temp_wake_duration", 300)  # 默认清醒 300秒 (5分钟)
+        # ==================================
         # 使用 pathlib 优化路径处理
         self.data_dir = (
-            Path(__file__).parent.parent.parent
-            / "plugin_data"
-            / "astrbot_plugin_shutup"
+                Path(__file__).parent.parent.parent
+                / "plugin_data"
+                / "astrbot_plugin_shutup"
         )
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.silence_map_path = self.data_dir / "silence_map.json"
@@ -196,23 +202,19 @@ class ShutupPlugin(Star):
             return False
 
     def _check_admin(self, event: AstrMessageEvent) -> bool:
-        """检查用户是否是管理员
-
-        Returns:
-            bool: True 表示是管理员(或不需要管理员权限)，False 表示不是管理员
-        """
         if not self.require_admin:
             return True
 
+        # 修正键名为 admins_id
         # 获取管理员列表
-        admins = self.context.get_config().get("admins", [])
+        admins = self.context.get_config().get("admins_id", [])
         sender_id = event.get_sender_id()
 
         # 检查发送者是否在管理员列表中
         return str(sender_id) in [str(admin) for admin in admins]
 
     async def _update_group_card(
-        self, event: AstrMessageEvent, origin: str, remaining_minutes: int
+            self, event: AstrMessageEvent, origin: str, remaining_minutes: int
     ) -> None:
         """更新群昵称显示剩余时长"""
         if not self.group_card_enabled:
@@ -258,11 +260,11 @@ class ShutupPlugin(Star):
                     )
                     # 群昵称(群名片)
                     self.original_group_cards[origin] = (
-                        member_info.get("card", "") or ""
+                            member_info.get("card", "") or ""
                     )
                     # QQ昵称
                     self.original_nicknames[origin] = (
-                        member_info.get("nickname", "") or ""
+                            member_info.get("nickname", "") or ""
                     )
                     logger.debug(
                         f"[Shutup] 保存原始信息 | 群昵称: {self.original_group_cards[origin]} | QQ昵称: {self.original_nicknames[origin]}"
@@ -382,12 +384,46 @@ class ShutupPlugin(Star):
                 event.stop_event()
                 return
 
-        # 3. 检查定时闭嘴
+        # 3. 检查定时闭嘴 (bot的睡眠时间)
         if self._is_in_scheduled_time():
-            logger.info("[Shutup] ⏰ 定时闭嘴生效中")
-            event.should_call_llm(False)
-            event.stop_event()
-            return
+            wake_expiry = self.temp_wake_map.get(origin)
+            if wake_expiry and time.time() < wake_expiry:
+                remaining = int(wake_expiry - time.time())
+                logger.info(f"[Shutup] ⏰ bot正处于梦游清醒状态 | 剩余: {remaining}s")
+            else:
+                if wake_expiry:
+                    self.temp_wake_map.pop(origin, None)
+
+                logger.info("[Shutup] ⏰ 定时闭嘴(睡眠)生效中，呼呼呼...")
+
+                # ====== 梦中被戳到的专属回复 ======
+                # 判断用户是不是在明确找bot（比如 @了bot，或者带了前缀）
+                is_talking_to_me = self._check_prefix(event)
+
+                # 或者带了全局命令符（比如 /）
+                cmd_prefix = self.context.get_config().get("command_prefix", "/")
+                if isinstance(cmd_prefix, list):
+                    if any(text.startswith(p) for p in cmd_prefix):
+                        is_talking_to_me = True
+                elif isinstance(cmd_prefix, str) and text.startswith(cmd_prefix):
+                    is_talking_to_me = True
+
+                # 如果你明确跟bot搭话，bot就会迷迷糊糊地抗议
+                if is_talking_to_me:
+                    # 动态获取你在后台设置的第一个唤醒词，比如 "小爱醒醒"
+                    wake_word = self.unshutup_cmds[0] if self.unshutup_cmds else "小爱醒醒"
+
+                    # 获取当前的命令符号用于显示
+                    display_prefix = cmd_prefix[0] if isinstance(cmd_prefix, list) and cmd_prefix else (
+                        "" if isinstance(cmd_prefix, list) else cmd_prefix)
+
+                    yield event.plain_result(
+                        f"{self.bot_name}已经睡了，要叫醒{self.bot_name}吗~（回复：{display_prefix}{wake_word}）")
+                # ==========================================
+
+                event.should_call_llm(False)
+                event.stop_event()
+                return
 
         # 4. 检查手动禁言状态
         expiry = self.silence_map.get(origin)
@@ -407,9 +443,15 @@ class ShutupPlugin(Star):
                 return
 
     async def _handle_shutup_command(
-        self, event: AstrMessageEvent, text: str, origin: str
+            self, event: AstrMessageEvent, text: str, origin: str
     ) -> str:
         """处理闭嘴指令"""
+        # ====== 判断是不是在半夜提前哄睡 ======
+        is_sleep_early = self._is_in_scheduled_time() and origin in getattr(self, 'temp_wake_map', {})
+        if is_sleep_early:
+            self.temp_wake_map.pop(origin, None)  # 清除清醒倒计时
+        # ==========================================
+
         # 解析时长
         for cmd in self.shutup_cmds:
             if text.startswith(cmd):
@@ -442,10 +484,15 @@ class ShutupPlugin(Star):
         )
         logger.info(f"[Shutup] 🔇 已禁言 | 时长: {duration}s | 到期: {expiry_time}")
 
+        # ====== 哄睡成功的专属回复 ======
+        if is_sleep_early:
+            return f"那{self.bot_name}继续回被窝啦，晚安喵~"
+        # ====================================
+
         return self.shutup_reply.format(duration=duration, expiry_time=expiry_time)
 
     async def _handle_unshutup_command(
-        self, event: AstrMessageEvent, origin: str
+            self, event: AstrMessageEvent, origin: str
     ) -> str:
         """处理解除闭嘴指令"""
         # 计算已禁言时长
@@ -468,9 +515,16 @@ class ShutupPlugin(Star):
             self.origin_to_event_map.pop(origin, None)
 
         expiry_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
-        logger.info(f"[Shutup] 🔊 已解除禁言 | 已禁言: {duration}s")
+        # ====== 新增：处理睡眠期间被强行叫醒 ======
+        if self._is_in_scheduled_time():
+            self.temp_wake_map[origin] = time.time() + self.temp_wake_duration
+            wake_minutes = self.temp_wake_duration // 60
+            logger.info(f"[Shutup] ⏰ 睡眠期间被叫醒，清醒 {wake_minutes} 分钟")
+            return f"喵...谁呀...{self.bot_name}被叫醒了，还能强撑着陪你聊 {wake_minutes} 分钟哦..."
 
-        return self.unshutup_reply.format(duration=duration, expiry_time=expiry_time)
+        logger.info(f"[Shutup] 🔊 已解除禁言 | 已禁言: {duration}s")
+        # 正常白天唤醒的回复
+        return f"{self.bot_name}早就醒着啦喵！随时可以陪你聊天哦~"
 
     @filter.llm_tool(name="shutup")
     async def llm_shutup(self, event: AstrMessageEvent, duration: int, unit: str = "m"):
@@ -518,7 +572,7 @@ class ShutupPlugin(Star):
             f"[Shutup] 🔇 LLM 调用闭嘴 | 时长: {duration_seconds}s | 到期: {expiry_time}"
         )
 
-        return f"已设置闭嘴 {int(duration_seconds/60)} 分钟，到期时间: {expiry_time}"
+        return f"已设置闭嘴 {int(duration_seconds / 60)} 分钟，到期时间: {expiry_time}"
 
     async def terminate(self):
         # 停止群昵称更新任务

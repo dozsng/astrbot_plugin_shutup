@@ -46,6 +46,12 @@
     "hint": "开启后，bot 会在指定时间段内自动保持沉默",
     "default": false
   },
+"bot_name": {
+    "type": "string",
+    "description": "机器人的自称",
+    "hint": "用于睡眠唤醒等提示语中的自称",
+    "default": "小爱"
+  },
   "scheduled_shutup_times": {
     "type": "text",
     "description": "定时闭嘴时间段",
