@@ -49,7 +49,7 @@
 "bot_name": {
     "type": "string",
     "description": "机器人的自称",
-    "hint": "用于睡眠唤醒等提示语中的自称",
+    "hint":"用于睡眠提示语。建议将此名字同步加入 AstrBot 平台设置中的‘唤醒词’，以实现直接喊名字唤醒的功能喵！",,
     "default": "小爱"
   },
   "sleep_mode_enabled": {

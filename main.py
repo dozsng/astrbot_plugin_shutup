@@ -500,7 +500,7 @@ class ShutupPlugin(Star):
 
         # ====== 哄睡成功的专属回复 ======
         if is_sleep_early:
-            return f"那{self.bot_name}继续回被窝啦，晚安喵~"
+            return f"那{self.bot_name}继续回被窝啦，晚安~"
         # ====================================
 
         return self.shutup_reply.format(duration=duration, expiry_time=expiry_time)
@@ -535,7 +535,7 @@ class ShutupPlugin(Star):
                 self.temp_wake_map[origin] = time.time() + self.temp_wake_duration
                 wake_minutes = self.temp_wake_duration // 60
                 logger.info(f"[Shutup] ⏰ 睡眠期间被叫醒，清醒 {wake_minutes} 分钟")
-                return f"喵...谁呀...{self.bot_name}被叫醒了，还能强撑着陪你聊 {wake_minutes} 分钟哦..."
+                return f"谁呀...{self.bot_name}被叫醒了，还能强撑着陪你聊 {wake_minutes} 分钟哦..."
 
             logger.info(f"[Shutup] 🔊 已解除禁言 | 已禁言: {duration}s")
             # 睡眠模式下白天唤醒的回复
