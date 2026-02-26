@@ -52,6 +52,12 @@
     "hint": "用于睡眠唤醒等提示语中的自称",
     "default": "小爱"
   },
+  "sleep_mode_enabled": {
+    "type": "bool",
+    "description": "启用睡眠唤醒互动",
+    "hint": "开启后，定时闭嘴期间会有相应的哄睡、叫醒等互动提示语。若仅需要安静的定时禁言，请关闭此项",
+    "default": true
+  },
   "scheduled_shutup_times": {
     "type": "text",
     "description": "定时闭嘴时间段",

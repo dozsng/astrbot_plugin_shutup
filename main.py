@@ -69,9 +69,9 @@ class ShutupPlugin(Star):
         self.silence_map = {}
         # ====== 新增：睡眠唤醒配置 ======
         self.bot_name = config.get("bot_name", "小爱")  # 默认叫小爱，可以在配置面板改喵
+        self.sleep_mode_enabled = config.get("sleep_mode_enabled", True)  # 新增：睡眠模式开关
         self.temp_wake_map = {}  # 记录谁把bot叫醒了
         self.temp_wake_duration = config.get("temp_wake_duration", 300)  # 默认清醒 300秒 (5分钟)
-        # ==================================
         # 使用 pathlib 优化路径处理
         self.data_dir = (
                 Path(__file__).parent.parent.parent
@@ -384,46 +384,45 @@ class ShutupPlugin(Star):
                 event.stop_event()
                 return
 
-        # 3. 检查定时闭嘴 (bot的睡眠时间)
-        if self._is_in_scheduled_time():
-            wake_expiry = self.temp_wake_map.get(origin)
-            if wake_expiry and time.time() < wake_expiry:
-                remaining = int(wake_expiry - time.time())
-                logger.info(f"[Shutup] ⏰ bot正处于梦游清醒状态 | 剩余: {remaining}s")
-            else:
-                if wake_expiry:
-                    self.temp_wake_map.pop(origin, None)
+            # 3. 检查定时闭嘴 (bot的睡眠时间)
+            if self._is_in_scheduled_time():
+                if self.sleep_mode_enabled:
+                    # 开启了睡眠模式：执行睡眠互动逻辑
+                    wake_expiry = self.temp_wake_map.get(origin)
+                    if wake_expiry and time.time() < wake_expiry:
+                        remaining = int(wake_expiry - time.time())
+                        logger.info(f"[Shutup] ⏰ bot正处于梦游清醒状态 | 剩余: {remaining}s")
+                    else:
+                        if wake_expiry:
+                            self.temp_wake_map.pop(origin, None)
 
-                logger.info("[Shutup] ⏰ 定时闭嘴(睡眠)生效中，呼呼呼...")
+                        logger.info("[Shutup] ⏰ 定时闭嘴(睡眠)生效中，呼呼呼...")
 
-                # ====== 梦中被戳到的专属回复 ======
-                # 判断用户是不是在明确找bot（比如 @了bot，或者带了前缀）
-                is_talking_to_me = self._check_prefix(event)
+                        # 判断是否是在呼叫 bot
+                        is_talking_to_me = self._check_prefix(event)
+                        cmd_prefix = self.context.get_config().get("command_prefix", "/")
+                        if isinstance(cmd_prefix, list):
+                            if any(text.startswith(p) for p in cmd_prefix):
+                                is_talking_to_me = True
+                        elif isinstance(cmd_prefix, str) and text.startswith(cmd_prefix):
+                            is_talking_to_me = True
 
-                # 或者带了全局命令符（比如 /）
-                cmd_prefix = self.context.get_config().get("command_prefix", "/")
-                if isinstance(cmd_prefix, list):
-                    if any(text.startswith(p) for p in cmd_prefix):
-                        is_talking_to_me = True
-                elif isinstance(cmd_prefix, str) and text.startswith(cmd_prefix):
-                    is_talking_to_me = True
+                        if is_talking_to_me:
+                            wake_word = self.unshutup_cmds[0] if self.unshutup_cmds else f"{self.bot_name}醒醒"
+                            display_prefix = cmd_prefix[0] if isinstance(cmd_prefix, list) and cmd_prefix else (
+                                "" if isinstance(cmd_prefix, list) else cmd_prefix)
+                            yield event.plain_result(
+                                f"{self.bot_name}已经睡了，要叫醒{self.bot_name}吗~（回复：{display_prefix}{wake_word}）")
 
-                # 如果你明确跟bot搭话，bot就会迷迷糊糊地抗议
-                if is_talking_to_me:
-                    # 动态获取你在后台设置的第一个唤醒词，比如 "小爱醒醒"
-                    wake_word = self.unshutup_cmds[0] if self.unshutup_cmds else "小爱醒醒"
-
-                    # 获取当前的命令符号用于显示
-                    display_prefix = cmd_prefix[0] if isinstance(cmd_prefix, list) and cmd_prefix else (
-                        "" if isinstance(cmd_prefix, list) else cmd_prefix)
-
-                    yield event.plain_result(
-                        f"{self.bot_name}已经睡了，要叫醒{self.bot_name}吗~（回复：{display_prefix}{wake_word}）")
-                # ==========================================
-
-                event.should_call_llm(False)
-                event.stop_event()
-                return
+                        event.should_call_llm(False)
+                        event.stop_event()
+                        return
+                else:
+                    # 没开启睡眠模式：直接安静拦截，不回复任何话
+                    logger.info("[Shutup] ⏰ 定时闭嘴生效中")
+                    event.should_call_llm(False)
+                    event.stop_event()
+                    return
 
         # 4. 检查手动禁言状态
         expiry = self.silence_map.get(origin)
@@ -447,7 +446,7 @@ class ShutupPlugin(Star):
     ) -> str:
         """处理闭嘴指令"""
         # ====== 判断是不是在半夜提前哄睡 ======
-        is_sleep_early = self._is_in_scheduled_time() and origin in getattr(self, 'temp_wake_map', {})
+        is_sleep_early = self.sleep_mode_enabled and self._is_in_scheduled_time() and origin in getattr(self,'temp_wake_map',{})
         if is_sleep_early:
             self.temp_wake_map.pop(origin, None)  # 清除清醒倒计时
         # ==========================================
@@ -516,15 +515,20 @@ class ShutupPlugin(Star):
 
         expiry_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
         # ====== 新增：处理睡眠期间被强行叫醒 ======
-        if self._is_in_scheduled_time():
-            self.temp_wake_map[origin] = time.time() + self.temp_wake_duration
-            wake_minutes = self.temp_wake_duration // 60
-            logger.info(f"[Shutup] ⏰ 睡眠期间被叫醒，清醒 {wake_minutes} 分钟")
-            return f"喵...谁呀...{self.bot_name}被叫醒了，还能强撑着陪你聊 {wake_minutes} 分钟哦..."
+        if self.sleep_mode_enabled:
+            if self._is_in_scheduled_time():
+                self.temp_wake_map[origin] = time.time() + self.temp_wake_duration
+                wake_minutes = self.temp_wake_duration // 60
+                logger.info(f"[Shutup] ⏰ 睡眠期间被叫醒，清醒 {wake_minutes} 分钟")
+                return f"喵...谁呀...{self.bot_name}被叫醒了，还能强撑着陪你聊 {wake_minutes} 分钟哦..."
 
+            logger.info(f"[Shutup] 🔊 已解除禁言 | 已禁言: {duration}s")
+            # 睡眠模式下白天唤醒的回复
+            return f"{self.bot_name}早就醒着啦喵！随时可以陪你聊天哦~"
+
+        # ====== 如果没开睡眠模式，就用原作者设定的默认解除文本 ======
         logger.info(f"[Shutup] 🔊 已解除禁言 | 已禁言: {duration}s")
-        # 正常白天唤醒的回复
-        return f"{self.bot_name}早就醒着啦喵！随时可以陪你聊天哦~"
+        return self.unshutup_reply.format(duration=duration, expiry_time=expiry_time)
 
     @filter.llm_tool(name="shutup")
     async def llm_shutup(self, event: AstrMessageEvent, duration: int, unit: str = "m"):
